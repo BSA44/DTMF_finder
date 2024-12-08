@@ -234,9 +234,10 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
         for freq in freqs:
             # Find the closest frequency bin to the target frequency
             bin_idx = np.argmin(np.abs(frequencies - freq))
-            #for i in range(bin_idx-5,bin_idx+5):
-            #    mask[i] = 1  # Set the corresponding frequency bin to 1
-            mask[bin_idx]=1    
+            for i in range(bin_idx-50,bin_idx+50):
+                mask[i] = 1  # Set the corresponding frequency bin to 1
+            #mask[bin_idx]=1
+        print(np.sum(mask))    
         masks[key] = mask
     for t in range(stft_result.shape[1]):
         time_slice = np.abs(stft_result[:, t])  # Get the magnitude of the t-th time slice
@@ -245,7 +246,7 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
         for key, mask in masks.items():
             # Perform scalar multiplication (dot product) of mask with time slice
             masked_sum = np.dot(mask, time_slice)
-            
+            print(masked_sum)
             if masked_sum > max_sum:
                 max_key = key
                 max_sum = masked_sum
