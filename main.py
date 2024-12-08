@@ -14,8 +14,8 @@ SETTINGS = {
     'HOP_LEN':  8820//4,  # Default hop length
     'WIN_LEN':  8820//2, #default win lenght
     'MAGNITUDE_AMP_MULTIPLIER':25, #by how much increase the amplituted of DTMF freqs before applying threshold filtering
-    'THRESHOLD_PERCENTILE': 99, #which percentile to use as a threshold
-    'MASKS_MEDIAN_MULTIPLIER':10, #by how much to multiply median when extractin keys
+    'THRESHOLD_PERCENTILE': 97.9, #which percentile to use as a threshold
+    'MASKS_MEDIAN_MULTIPLIER':1.0, #by how much to multiply median when extractin keys
     'PLT_YLIM_LOWER':0, #lower freq to show
     'PLT_YLIM_UPPER':2048, #upper freq to show
     'FIG_SIZE_X':10, # control width of diagram
@@ -85,7 +85,8 @@ def threshold_filtering(magnitude,phase,freq_min,freq_max,sr,n_fft):
 # Step 3: Amplify the DTMF frequencies by 10 times
     amplified_magnitude = magnitude.copy()
     for bin_idx in dtmf_bins:
-        amplified_magnitude[bin_idx, :] *= SETTINGS['MAGNITUDE_AMP_MULTIPLIER']  
+        for i in range(max(0, bin_idx - 2), min(len(frequencies), bin_idx + 3)):
+            amplified_magnitude[bin_idx, :] *= SETTINGS['MAGNITUDE_AMP_MULTIPLIER']  
 
 
     print(threshold)
@@ -163,7 +164,7 @@ def compute_median_dtmf_masks(stft_result,sr,n_fft):
 
     # Get the frequencies corresponding to STFT rows
     frequencies = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
-
+    tolerance_bins=5
     # Step 4: Generate masks for each key
     masks = {}
     for key, freqs in dtmf_frequencies.items():
@@ -172,9 +173,9 @@ def compute_median_dtmf_masks(stft_result,sr,n_fft):
         for freq in freqs:
             # Find the closest frequency bin to the target frequency
             bin_idx = np.argmin(np.abs(frequencies - freq))
-            #for i in range(bin_idx-5,bin_idx+5):
-            #    mask[i] = 1  # Set the corresponding frequency bin to 1
-            mask[bin_idx]=1    
+            for i in range(max(0, bin_idx - tolerance_bins), min(len(mask), bin_idx + tolerance_bins)):
+                mask[i] = 1  # Set the corresponding frequency bin to 1
+            #mask[bin_idx]=1    
         masks[key] = mask
         print(mask)
 
@@ -234,7 +235,8 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
         for freq in freqs:
             # Find the closest frequency bin to the target frequency
             bin_idx = np.argmin(np.abs(frequencies - freq))
-            for i in range(bin_idx-50,bin_idx+50):
+            #for i in range(bin_idx-50,bin_idx+50):
+            for i in range(max(0, bin_idx - 5), min(len(mask), bin_idx + 5)):
                 mask[i] = 1  # Set the corresponding frequency bin to 1
             #mask[bin_idx]=1
         print(np.sum(mask))    
@@ -253,6 +255,8 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
             # If the sum is not zero, the key's frequencies exist
         if max_sum > masked_sums_median*SETTINGS['MASKS_MEDIAN_MULTIPLIER']  or max_key=="-":
             preliminary_detected_keys.append(max_key)
+        else:
+            preliminary_detected_keys.append("-")
 
         return preliminary_detected_keys
 
@@ -295,7 +299,7 @@ def handle_audio_message(message):
         audio_buffer = fetch_audio_as_buffer(file_id)
         audio_buffer.seek(0)  # Ensure the buffer is at the beginning
         y, sr = sf.read(audio_buffer, dtype='float32')
-
+        print(sr)
     # If audio is stereo, convert it to mono
         if len(y.shape) > 1:
             y = librosa.to_mono(y.T)
@@ -340,9 +344,11 @@ def handle_audio_message(message):
         bot.reply_to(message, f"Masks median is {str(masks_sum_median)}")
         #apply masks to get keys and check for median
         prelim_keys = detect_keys_preliminary(stft_result_threshold_filtered,sr,SETTINGS['N_FFT'],masks_sum_median)
+        print(prelim_keys)
         bot.reply_to(message, f"Here are preliminary detected keys {','.join(prelim_keys)}")
         final_keys = extract_final_keys(prelim_keys)
-        bot.reply_to(message, f"Here are final keys: {','.join(prelim_keys)}")
+        print(final_keys)
+        bot.reply_to(message, f"Here are final keys: {','.join(final_keys)}")
         
         
 
