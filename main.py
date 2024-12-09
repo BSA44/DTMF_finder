@@ -8,7 +8,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 
-API_TOKEN = 
+API_TOKEN ="API_PLACE_HOLDER"
 SETTINGS = {
     'N_FFT': 8820//2,   # Default FFT window size
     'HOP_LEN':  8820//4,  # Default hop length
