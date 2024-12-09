@@ -1,4 +1,5 @@
 import matplotlib
+import magic
 matplotlib.use('Agg')  # Fix for GUI backend error
 import telebot
 import requests
@@ -13,11 +14,11 @@ SETTINGS = {
     'N_FFT': 8820//2,   # Default FFT window size
     'HOP_LEN':  8820//4,  # Default hop length
     'WIN_LEN':  8820//2, #default win lenght
-    'MAGNITUDE_AMP_MULTIPLIER':25, #by how much increase the amplituted of DTMF freqs before applying threshold filtering
-    'THRESHOLD_PERCENTILE': 97.9, #which percentile to use as a threshold
-    'MASKS_MEDIAN_MULTIPLIER':1.0, #by how much to multiply median when extractin keys
+    'MAGNITUDE_AMP_MULTIPLIER':25.0, #by how much increase the amplituted of DTMF freqs before applying threshold filtering
+    'THRESHOLD_PERCENTILE': 99.0, #which percentile to use as a threshold
+    'MASKS_MEDIAN_MULTIPLIER':10.0, #by how much to multiply median when extractin keys
     'PLT_YLIM_LOWER':0, #lower freq to show
-    'PLT_YLIM_UPPER':2048, #upper freq to show
+    'PLT_YLIM_UPPER':16384, #upper freq to show
     'FIG_SIZE_X':10, # control width of diagram
     'FIG_SIZE_Y':4, # control height of diagram
     #'PLT_XLIM_LOWER':0,
@@ -76,6 +77,7 @@ def threshold_filtering(magnitude,phase,freq_min,freq_max,sr,n_fft):
     n = SETTINGS['THRESHOLD_PERCENTILE'] # Define the percentile
     percentile_magnitude = np.percentile(magnitude_in_range, n)
     threshold = percentile_magnitude
+    #threshold =25.059767
     dtmf_frequencies = [697, 770, 852, 941, 1209, 1336, 1477, 1633]
 
 # Step 2: Get the frequency bins corresponding to DTMF tones
@@ -83,10 +85,10 @@ def threshold_filtering(magnitude,phase,freq_min,freq_max,sr,n_fft):
     dtmf_bins = [np.argmin(np.abs(frequencies - freq)) for freq in dtmf_frequencies]
 
 # Step 3: Amplify the DTMF frequencies by 10 times
-    amplified_magnitude = magnitude.copy()
+    amplified_magnitude = np.copy(magnitude)
     for bin_idx in dtmf_bins:
-        for i in range(max(0, bin_idx - 2), min(len(frequencies), bin_idx + 3)):
-            amplified_magnitude[bin_idx, :] *= SETTINGS['MAGNITUDE_AMP_MULTIPLIER']  
+        #for i in range(max(0, bin_idx - 2), min(len(frequencies), bin_idx + 3)):
+        amplified_magnitude[bin_idx, :] *= SETTINGS['MAGNITUDE_AMP_MULTIPLIER']  
 
 
     print(threshold)
@@ -173,9 +175,9 @@ def compute_median_dtmf_masks(stft_result,sr,n_fft):
         for freq in freqs:
             # Find the closest frequency bin to the target frequency
             bin_idx = np.argmin(np.abs(frequencies - freq))
-            for i in range(max(0, bin_idx - tolerance_bins), min(len(mask), bin_idx + tolerance_bins)):
-                mask[i] = 1  # Set the corresponding frequency bin to 1
-            #mask[bin_idx]=1    
+            #for i in range(max(0, bin_idx - tolerance_bins), min(len(mask), bin_idx + tolerance_bins)):
+            #    mask[i] = 1  # Set the corresponding frequency bin to 1
+            mask[bin_idx]=1    
         masks[key] = mask
         print(mask)
 
@@ -236,9 +238,9 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
             # Find the closest frequency bin to the target frequency
             bin_idx = np.argmin(np.abs(frequencies - freq))
             #for i in range(bin_idx-50,bin_idx+50):
-            for i in range(max(0, bin_idx - 5), min(len(mask), bin_idx + 5)):
-                mask[i] = 1  # Set the corresponding frequency bin to 1
-            #mask[bin_idx]=1
+            #for i in range(max(0, bin_idx - 5), min(len(mask), bin_idx + 5)):
+            #    mask[i] = 1  # Set the corresponding frequency bin to 1
+            mask[bin_idx]=1
         print(np.sum(mask))    
         masks[key] = mask
     for t in range(stft_result.shape[1]):
@@ -257,7 +259,7 @@ def detect_keys_preliminary(stft_result,sr,n_fft,masked_sums_median):
             preliminary_detected_keys.append(max_key)
         else:
             preliminary_detected_keys.append("-")
-
+        print(preliminary_detected_keys)
         return preliminary_detected_keys
 
 def extract_final_keys(prelim_keys):
@@ -287,18 +289,47 @@ Just record me an audio message!\
 """)
 
 
-@bot.message_handler(content_types=['audio', 'voice'])
+@bot.message_handler(content_types=['audio', 'voice','document'])
 def handle_audio_message(message):
+    print(f"Received content type: {message.content_type}")
     try:
-        # Get the file ID
-        file_id = message.audio.file_id if message.content_type == 'audio' else message.voice.file_id
+         
+        audio_buffer = None
+
+        # Handle audio and voice messages
+        if message.content_type in ['audio', 'voice']:
+            file_id = message.audio.file_id if message.content_type == 'audio' else message.voice.file_id
+            audio_buffer = fetch_audio_as_buffer(file_id)
+
+        # Handle document messages for WAV files
+        elif message.content_type == 'document':
+            file_id = message.document.file_id
+            audio_buffer = fetch_audio_as_buffer(file_id)
+
+            # Check the file type using magic bytes
+            #mime = magic.Magic(mime=True)
+            #file_type = mime.from_buffer(audio_buffer.getvalue())
+            file_info = bot.get_file(message.document.file_id)
+            if not file_info.file_path.endswith('.wav'):
+                bot.reply_to(message, "Please send a valid WAV file with the .wav extension.")
+                return
+
+        else:
+            bot.reply_to(message, "Unsupported file type. Please send audio or WAV files.")
+            return
+
+        if audio_buffer is None:
+            bot.reply_to(message, "An error occurred: Could not process the file.")
+            return
         bot.reply_to(message, "Started tha analisys of audio",parse_mode="MarkdownV2")
 
         
         # Fetch audio file as a buffer
-        audio_buffer = fetch_audio_as_buffer(file_id)
+        #audio_buffer = fetch_audio_as_buffer(file_id)
         audio_buffer.seek(0)  # Ensure the buffer is at the beginning
-        y, sr = sf.read(audio_buffer, dtype='float32')
+        #y, sr = sf.read(audio_buffer, dtype='float32')
+        y, sr = librosa.load(audio_buffer,sr=None)
+
         print(sr)
     # If audio is stereo, convert it to mono
         if len(y.shape) > 1:
@@ -319,22 +350,7 @@ def handle_audio_message(message):
         bot.send_photo(message.chat.id, spectrogram_image, caption="Here is the spectrogram of initial audio")
         # threshold filtering
         stft_result_threshold_filtered = threshold_filtering(magnitude,phase,691,1640,sr,SETTINGS['N_FFT'])
-        #frequencies = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
 
-        # Step 3: Identify frequency bins within the desired range
-        #freq_range = (frequencies >= 690) & (frequencies <= 1700)  # Boolean mask for frequency range
-        #magnitude_in_range = magnitude[freq_range, :]  # Extract magnitudes in this range
-
-# Step 4: Calculate the maximum magnitude in this range
-        #max_magnitude = np.max(magnitude_in_range)
-
-# Step 5: Compute the threshold as half of the maximum
-        #threshold = max_magnitude / 2
-
-
-        #threshold = 5
-        #print(threshold)
-        #stft_result_filtered = magnitude * (np.abs(magnitude) > threshold) * phase
         spectrogram_filtered  = librosa.amplitude_to_db(np.abs(stft_result_threshold_filtered), ref=np.max)
         spectrogram_image_filtered = generate_spectrogram_image(spectrogram_filtered,sr,SETTINGS['HOP_LEN'])
 
