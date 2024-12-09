@@ -32,8 +32,7 @@ bot = telebot.TeleBot(API_TOKEN)
 def generate_spectrogram_image(spectrogram,sr,hop_length):
     # Read audio from the buffer with soundfile
     print("Plotting")
-    plt.figure(figsize=(SETTINGS['FIG_SIZE_X'], SETTINGS['FIG_SIZE_Y']))
-    librosa.display.specshow(spectrogram,hop_length=hop_length, sr=sr, x_axis='time', y_axis='log')
+    plt.figure(figsize=(SETTINGS['FIG_SIZE_X'], SETTINGS['FIG_SIZE_Y']))    librosa.display.specshow(spectrogram,hop_length=hop_length, sr=sr, x_axis='time', y_axis='log')
     plt.colorbar(format='%+2.0f dB')
     plt.title('Spectrogram')
     plt.xlabel('Time (s)')

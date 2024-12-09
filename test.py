@@ -128,8 +128,7 @@ def handle_audio_message(message):
             amplified_magnitude[bin_idx, :] *= SETTINGS['MAGNITUDE_AMP_MULTIPLIER'] #tweaking
         print(threshold)
         stft_filtered = amplified_magnitude * (np.abs(amplified_magnitude) > threshold) * phase
-
-
+        #sending a new plot
         print("PLOTTING 2")
         plt.figure(figsize=(SETTINGS['FIG_SIZE_X'], SETTINGS['FIG_SIZE_Y']))
         librosa.display.specshow(librosa.amplitude_to_db(abs(stft_filtered), ref=np.max),hop_length=SETTINGS['HOP_LEN'], sr=sr, x_axis='time', y_axis='log')
@@ -139,14 +138,13 @@ def handle_audio_message(message):
         plt.ylabel('Frequency (Hz)')
         plt.tight_layout()
         plt.ylim(SETTINGS['PLT_YLIM_LOWER'],SETTINGS['PLT_YLIM_UPPER'])
-        #plt.xlim(SETTINGS['PLT_XLIM_LOWER'],SETTINGS['PLT_XLIM_UPPER'])
         # Save the plot to an in-memory buffer
         image_buffer = io.BytesIO()
         plt.savefig(image_buffer, format='png')
         plt.close()  # Close the plot to free up memory
         image_buffer.seek(0)# Send the spectrogram image back to the user
-
         bot.send_photo(message.chat.id, image_buffer, caption="Here is the spectrogram of cleaned audio")
+        #calculating masks median for further filtering
         bot.reply_to(message, "Calculating the masks median",parse_mode="MarkdownV2")
         
         dtmf_frequencies = {
@@ -184,8 +182,6 @@ def handle_audio_message(message):
             masks[key] = mask
 
 
-        # Step 5: Detect keys based on masks and time slices
-        #detected_keys = []  # List to store detected keys
         masked_sums =[] # list to store dot products
         # Iterate through each time slice
         for t in range(stft_filtered.shape[1]):
@@ -201,6 +197,8 @@ def handle_audio_message(message):
                 masked_sums.append(masked_sum)
 
         print(masked_sums)
+
+        # List to store detected keys
         new_detected_keys = []
         for t in range(stft_filtered.shape[1]):
             time_slice = np.abs(stft_filtered[:, t])  # Get the magnitude of the t-th time slice
@@ -214,7 +212,7 @@ def handle_audio_message(message):
                     max_key = key
                     max_sum = masked_sum
                 # If the sum is not zero, the key's frequencies exist
-            if max_sum > np.median(masked_sums)*SETTINGS['MASKS_MEDIAN_MULTIPLIER']  or max_key=="-":
+            if max_sum > np.median(masked_sums)*SETTINGS['MASKS_MEDIAN_MULTIPLIER']  or max_key=="-": # if it is more than scaled median then it is not noise 
                 new_detected_keys.append(max_key)
 
         print(new_detected_keys)
@@ -231,33 +229,6 @@ def handle_audio_message(message):
 
         print(final_keys)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
         bot.reply_to(message, f"Masks median is {str(np.median(masked_sums))}")
         #apply masks to get keys and check for median
         print(new_detected_keys)
@@ -265,12 +236,7 @@ def handle_audio_message(message):
         print(final_keys)
         bot.reply_to(message, f"Here are final keys: {','.join(final_keys)}")
         
-        
 
-        
-
-
-    
     except Exception as e:
         bot.reply_to(message, f"An error occurred: {str(e)}")
 
