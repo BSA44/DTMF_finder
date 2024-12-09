@@ -1,5 +1,4 @@
 import matplotlib
-import magic
 matplotlib.use('Agg')  # Fix for GUI backend error
 import telebot
 import requests
@@ -8,8 +7,8 @@ import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
-import soundfile as sf
-API_TOKEN = '7214725097:AAEXF5LWWlXS60OFL3w2PLOgDhPmyJCGApc'
+
+API_TOKEN = 
 SETTINGS = {
     'N_FFT': 8820//2,   # Default FFT window size
     'HOP_LEN':  8820//4,  # Default hop length
