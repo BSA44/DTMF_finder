@@ -7,8 +7,10 @@ import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
+import dotenv
+dotenv.load_dotenv()
 
-API_TOKEN ="API_PLACE_HOLDER"
+API_TOKEN = os.getenv('API_TOKEN')
 SETTINGS = {
     'N_FFT': 8820//2,   # Default FFT window size
     'HOP_LEN':  8820//4,  # Default hop length
