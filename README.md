@@ -79,7 +79,7 @@ DTMF is the signal generated when you press buttons on a telephone keypad. Each 
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/BSA44/DTMF_finder.git
 cd DTMF_finder
 ```
 
